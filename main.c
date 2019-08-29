@@ -5,6 +5,20 @@
 #include "draw.h"
 #include "vec3.h"
 
+static void vec3_reflect(Vec3* vr, const Vec3* vi, const Vec3* vn) {
+  Vec3 vt;
+  float t = vec3_dot(vn, vi) * 2.0f;
+  vec3_scale(&vt, vn, t);
+  vec3_subtract(vr, vi, &vt);
+}
+
+static void vec3_project(Vec3* vr, const Vec3* va, const Vec3* vb) {
+  Vec3 vt;
+  vec3_normalize(&vt, vb);
+  float a1 = vec3_dot(va, &vt);
+  vec3_scale(vr, &vt, a1);
+}
+
 int main() {
 
   SDL_SetHint("SDL_HINT_NO_SIGNAL_HANDLERS", "1");
@@ -28,6 +42,8 @@ int main() {
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glColor3f(0.5f, 0.5f, 0.5f);
 
     // Draw some X pattern
     Vec3 tl = { -1.0f,  1.0f, 0.0f };
@@ -126,6 +142,99 @@ int main() {
     vec3_scale(&scaled_velocity, &velocity, 10.0f);
     vec3_add(&tip, &position, &scaled_velocity);
     drawDebugLine(&position, &tip);
+
+
+
+
+
+
+
+
+    {
+      const float display_scale = 100.0f;
+      Vec3 p = {  0.5f, 0.0f, 0.0f };
+      Vec3 n = { -1.0f, 0.0f, 0.0f };
+      Vec3 i = { 1.0f, 1.0f, 0.0f };
+
+
+#if 0
+      // Hack: Instead of fixed normal, generate from player position
+      vec3_subtract(&n, &position, &p);
+      vec3_normalize(&n, &n);
+#endif
+
+#if 0
+      // Hack: Make incident vector from player position
+      vec3_subtract(&i, &p, &position);
+#endif
+
+#if 1
+      // Hack: Make incident vector from player velocity
+      //       This is how it should be eventually
+      vec3_copy(&i, &velocity);
+#endif
+
+
+      // Project incident on normal, so we know collision speed
+      // Length of `c` is wall-hit-sound volume + possible speed damp?
+      //FIXME: Inline code, so we don't have to calculate length
+      Vec3 c;
+      vec3_project(&c, &i, &n);
+
+      // Generate reflection (normal must be normalized at this point)
+      //FIXME: Can re-use some stuff from `vec3_project` (once inlined)
+      Vec3 o;
+      vec3_reflect(&o, &i, &n);
+
+      // Draw wall
+      glColor3f(1.0f, 1.0f, 1.0f);
+      Vec3 p_;
+      Vec3 t = { n.y, -n.x, 0.0f };
+      vec3_add(&p_, &p, &t);
+      drawDebugLine(&p, &p_);
+      vec3_subtract(&p_, &p, &t);
+      drawDebugLine(&p, &p_);
+
+      // Draw normal
+      glColor3f(0.1f, 0.1f, 0.1f);
+      Vec3 n_;
+      vec3_add(&n_, &p, &n);
+      drawDebugLine(&p, &n_);
+
+      // Draw collision vector
+      glColor3f(0.0f, 0.0f, 1.0f);
+      Vec3 c_;
+      vec3_scale(&c_, &c, display_scale);
+      vec3_subtract(&c_, &p, &c_);
+      drawDebugLine(&p, &c_);
+
+      // Draw incident line
+      glColor3f(0.0f, 1.0f, 0.0f);
+      Vec3 i_;
+      vec3_scale(&i_, &i, display_scale);
+      vec3_subtract(&i_, &p, &i_);
+      drawDebugLine(&i_, &p);
+
+      // Draw outgoing line
+      glColor3f(1.0f, 0.0f, 0.0f);
+      Vec3 o_;
+      vec3_scale(&o_, &o, display_scale);
+      vec3_add(&o_, &p, &o_);
+      drawDebugLine(&p, &o_);
+
+      // Hack: Replace speed by reflection (if space is pressed)
+      static bool was_pressed = true;
+      if (state[SDL_SCANCODE_SPACE]) {
+        if (!was_pressed) {
+          velocity = o;
+        }
+        was_pressed = true;
+      } else {
+        was_pressed = false;
+      }
+    }
+
+
 
 
     // Display new image
